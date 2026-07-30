@@ -352,18 +352,20 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            align-items: center;
+            text-align: center;
         }
 
         .detail-label {
-            font-size: 0.8em;
-            color: #666;
+            font-size: 1.2em;
+            color: #999;
             font-weight: bold;
             letter-spacing: 0.5px;
         }
 
         .detail-value {
             color: #ddd;
-            font-size: 1.1em;
+            font-size: 2em;
         }
 
         .severe-weather {
@@ -1340,7 +1342,7 @@
                         </div>
                         <div class="detail-item">
                             <div class="detail-label">💨 WIND</div>
-                            <div class="detail-value">${currentWindSpeed} ${currentWindDir}</div>
+                            <div class="detail-value">${currentWindSpeed}${currentWindDir}</div>
                         </div>
                         <div class="detail-item">
                             <div class="detail-label">💦 HUMID</div>
