@@ -356,6 +356,10 @@
             text-align: center;
         }
 
+        .detail-emoji {
+            font-size: 2.5em;
+        }
+
         .detail-label {
             font-size: 1.2em;
             color: #999;
@@ -1337,15 +1341,18 @@
                     <div class="current-conditions">${current.shortForecast}</div>
                     <div class="current-details">
                         <div class="detail-item">
-                            <div class="detail-label">${currentPrecipEmoji} PRECIP</div>
+                            <div class="detail-emoji">${currentPrecipEmoji}</div>
+                            <div class="detail-label">PRECIP</div>
                             <div class="detail-value">${precipDisplay}</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-label">💨 WIND</div>
+                            <div class="detail-emoji">💨</div>
+                            <div class="detail-label">WIND</div>
                             <div class="detail-value">${currentWindSpeed}${currentWindDir}</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-label">💦 HUMID</div>
+                            <div class="detail-emoji">💦</div>
+                            <div class="detail-label">HUMID</div>
                             <div class="detail-value">${humidityDisplay}</div>
                         </div>
                     </div>
