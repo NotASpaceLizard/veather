@@ -214,15 +214,22 @@
             }
 
             .tabs {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
                 gap: 8px;
             }
 
             .tab {
                 flex-shrink: 0;
-                padding: 10px 10px;
-                font-size: 0.95em;
+                padding: 10px 12px;
+                font-size: 1.5em;
+                min-width: 44px;
+            }
+
+            .tab-icon {
+                display: inline;
+            }
+
+            .tab-text {
+                display: none;
             }
         }
 
@@ -282,6 +289,14 @@
         .tab.active {
             color: #4da6ff;
             border-bottom-color: #4da6ff;
+        }
+
+        .tab-icon {
+            display: none;
+        }
+
+        .tab-text {
+            display: inline;
         }
 
         .tab-content {
@@ -629,10 +644,22 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('forecast')">Forecast</button>
-            <button class="tab" onclick="switchTab('hourly')">Hourly</button>
-            <button class="tab" onclick="switchTab('radar')">Radar</button>
-            <button class="tab" onclick="switchTab('locations')">Locations</button>
+            <button class="tab active" onclick="switchTab('forecast')">
+                <span class="tab-icon" id="forecast-tab-icon">☀️</span>
+                <span class="tab-text">Forecast</span>
+            </button>
+            <button class="tab" onclick="switchTab('hourly')">
+                <span class="tab-icon">🕐</span>
+                <span class="tab-text">Hourly</span>
+            </button>
+            <button class="tab" onclick="switchTab('radar')">
+                <span class="tab-icon">🗺️</span>
+                <span class="tab-text">Radar</span>
+            </button>
+            <button class="tab" onclick="switchTab('locations')">
+                <span class="tab-icon">⭐</span>
+                <span class="tab-text">Locations</span>
+            </button>
         </div>
 
         <div id="forecast-content" class="tab-content active">
@@ -1199,9 +1226,10 @@
                 idioms.push(isNight ? "Perfect for stargazing" : "Walkin on sunshine");
             }
 
-            // Default if none match
+            // Default if none match (check day/night)
             if (idioms.length === 0) {
-                idioms.push("Perfect for stargazing");
+                const isNight = forecast.isDaytime === false || (forecast.name && forecast.name.toLowerCase().includes('night'));
+                idioms.push(isNight ? "Perfect for stargazing" : "Walkin on sunshine");
             }
 
             return idioms;
@@ -1329,6 +1357,9 @@
             idiomIndex = 0;
             updateIdiomDisplay();
             startIdiomRotation();
+
+            // Update forecast tab icon with current weather
+            document.getElementById('forecast-tab-icon').textContent = currentConditionIcon;
 
             const currentTempF = current.temperatureUnit === 'F' ? current.temperature : Math.round(current.temperature * 9/5 + 32);
             const currentTempColor = getTempColor(currentTempF);
