@@ -4,7 +4,7 @@ A clean, dark-themed, mobile-optimized weather application using the National We
 
 ## Overview
 
-Single-page progressive web app that displays current conditions, multi-day forecast, detailed hourly weather data, and animated radar for any US location. Features location search, saved locations, and colorblind-friendly design. Built with vanilla HTML/CSS/JavaScript - no frameworks required.
+Single-page progressive web app that displays current conditions, multi-day forecast, detailed hourly weather data, and animated radar for any US location. Features location search, saved locations, weather idioms, and colorblind-friendly design. Built with vanilla HTML/CSS/JavaScript - no frameworks required.
 
 ## Features
 
@@ -24,40 +24,51 @@ Single-page progressive web app that displays current conditions, multi-day fore
 - **Geocoding** - Powered by Nominatim (OpenStreetMap)
 - **Persistent storage** - Locations saved to localStorage
 
+#### Header
+- **Weather idioms** - Rotating contextual phrases based on current conditions:
+  - Match weather conditions (sunny, rainy, stormy, snowy, etc.)
+  - React to temperature extremes (hot, cold)
+  - Respond to humidity and wind
+  - Multiple idioms rotate every 4 seconds when applicable
+  - Examples: "Walkin on sunshine", "Storms a-brewin", "Hot, humid, might rain"
+
 #### Forecast Tab
 - **Current conditions card** - Large display with:
   - Temperature with condition icon
   - Short forecast description
-  - Precipitation probability (with hourly stats)
-  - Wind speed & direction (arrow emoji shows where wind is blowing TO)
-  - Humidity range from hourly data
+  - Precipitation probability (current hour data)
+  - Wind speed & direction (current hour data, arrow emoji shows where wind is blowing TO)
+  - Humidity (current hour data)
   - Severe weather warnings when applicable
 
 - **Multi-day forecast periods** - Each showing:
   - Period name (e.g., "Tonight", "Thursday", "Thursday Night")
   - High/Low temperature with icon
   - Detailed forecast text
-  - Precipitation, wind, and humidity stats
+  - Precipitation (NWS value or max from hourly data)
+  - Wind speed & direction
+  - Humidity (average with range from hourly data)
 
 #### Hourly Tab
 - **24-hour detailed view** with visual bar charts for:
   - Temperature with conditional feels-like (shows "85°/92°" when different by 3°F+)
   - Precipitation probability
   - Precipitation amount (inches)
-  - Wind speed & direction (color-coded by intensity)
+  - Wind speed & direction (no space between, e.g., "15⬇️", color-coded by intensity)
   - Humidity percentage
   - UV index (color-coded by danger level)
 - **Customizable columns** - Toggle which data columns to display
   - AMT and UV hidden by default to reduce clutter
   - Preferences saved to localStorage
   - Grid adjusts dynamically
+  - Toggles scroll horizontally on mobile without wrapping
 
 #### Radar Tab
 - **Interactive map** - Powered by Leaflet + OpenStreetMap
 - **Animated radar** - RainViewer radar overlay
   - Past frames + nowcast data
-  - Play/pause animation controls
-  - Previous/next frame navigation
+  - Play/pause animation controls (▶️/⏸️ emoji buttons)
+  - Previous/next frame navigation (⏮️/⏭️ buttons)
   - Timestamp display
   - Auto-loop playback
 - **Dynamic centering** - Automatically centers on current location
@@ -83,6 +94,10 @@ Single-page progressive web app that displays current conditions, multi-day fore
 #### Design
 - **Dark theme** - #1a1a1a background with high contrast
 - **Mobile-optimized** - Touch-friendly buttons (44x44px), larger fonts, optimized spacing
+  - Tabs resize on small screens to fit better
+  - Column toggles scroll horizontally without wrapping
+  - Search bar stays on one line with location buttons
+  - Timestamps and wind values prevent line wrapping
 - **Responsive layout** - Adapts to screen size with breakpoints at 400px & 500px
 - **Accessibility** - Colorblind-friendly color palette, clear labels, emoji indicators
 - **PWA-ready** - Installable with manifest.json
@@ -197,15 +212,36 @@ veather/
 
 ## Development Notes
 
-### Data Accuracy
-- NWS forecast periods show their own precipitation probability
-- App also calculates average, min, max from hourly data for each period
-- Format: `NWS% (avg% [min-max])` provides more complete picture
+### Data Sources
+- **Current conditions** - Uses first hourly forecast data point for most accurate "right now" data:
+  - Temperature and feels-like from current hour
+  - Precipitation probability from current hour
+  - Wind speed and direction from current hour
+  - Humidity from current hour
+- **Forecast periods** - Uses NWS 12-hour periods:
+  - Precipitation: Shows NWS value if available, otherwise max from hourly data
+  - Humidity: Calculates avg [min-max] range from hourly data within period
+  - Wind: Uses NWS period value
 
 ### Icon Logic
 - Day/night detection uses `isDaytime` property from API
 - Falls back to checking period name for "night"
 - Weather conditions override time-based icons (rain always shows rain, etc.)
+
+### Weather Idioms
+- Rotates through all applicable idioms every 4 seconds (if multiple apply)
+- Priority order: severe weather → precipitation → temperature → humidity → wind → clouds → clear
+- Special combo: "Hot, humid, might rain" (temp/feels ≥90°F, precip ≥20%, humidity ≥70%)
+- Examples by condition:
+  - Clear/sunny: "Walkin on sunshine" / "Perfect for stargazing" (night)
+  - Partly cloudy: "Half cloudy, or half sunny?"
+  - Rain: "Tut tut, it looks like rain"
+  - Snow: "Let is snow"
+  - Storms: "Storms a-brewin"
+  - Hot (≥90°F): "ITS GON BE HOT"
+  - Cold (≤32°F): "ITS GON BE COLD"
+  - Humid (≥80%): "It's not the heat, it's the humidity"
+  - Windy (≥20mph): "It's not <i>that</i> the wind is blowing..."
 
 ### Wind Direction
 - API provides where wind is **coming FROM** (meteorological convention)
