@@ -1,4 +1,46 @@
 <!DOCTYPE html>
+<!--
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                  VEATHER                                   ║
+║                        Weather App with Personality                        ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+    Author:         David Sheldon
+    Version:        1.0
+    Last Updated:   2026-07-30
+
+    Description:
+        A mobile-first weather application featuring location search, animated
+        radar, and colorblind-friendly design. Built as a single-page PWA with
+        no framework dependencies.
+
+    Key Features:
+        - Location search (zip code or city/state)
+        - Saved locations (up to 5)
+        - 7-day forecast with detailed conditions
+        - 24-hour hourly forecast with toggleable columns
+        - Animated weather radar (RainViewer)
+        - Weather idioms that rotate based on conditions
+        - Colorblind-friendly temperature color palette
+        - Mobile-optimized touch targets and typography
+        - Progressive Web App support
+
+    Data Sources:
+        - National Weather Service API (forecast data)
+        - RainViewer API (radar imagery)
+        - Nominatim/OpenStreetMap (geocoding)
+        - Leaflet.js (map display)
+
+    Design Notes:
+        - Optimized for red-green colorblind users
+        - Mobile-first responsive design
+        - Dark theme for reduced eye strain
+        - No authentication or backend required
+
+    License:        Free to use and modify
+
+╚═══════════════════════════════════════════════════════════════════════════╝
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -178,6 +220,8 @@
 
             .tab {
                 flex-shrink: 0;
+                padding: 10px 12px;
+                font-size: 1em;
             }
         }
 
@@ -386,7 +430,7 @@
 
         .column-toggles {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 12px;
             margin-bottom: 15px;
             padding: 15px;
@@ -394,6 +438,17 @@
             border-radius: 8px;
             border: 1px solid #444;
             font-size: 1em;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .column-toggles::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .column-toggles::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
         }
 
         .column-toggle {
@@ -404,6 +459,8 @@
             user-select: none;
             padding: 5px;
             min-height: 44px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .column-toggle input[type="checkbox"] {
@@ -443,7 +500,7 @@
             border-radius: 8px;
             border: 1px solid #444;
             display: grid;
-            grid-template-columns: 60px 40px 1fr;
+            grid-template-columns: 70px 40px 1fr;
             gap: 12px;
             align-items: center;
             font-size: 1em;
@@ -453,6 +510,7 @@
             font-weight: bold;
             color: #4da6ff;
             font-size: 1.05em;
+            white-space: nowrap;
         }
 
         .hourly-icon {
@@ -586,7 +644,7 @@
 
         <div id="radar-content" class="tab-content">
             <div class="radar-controls">
-                <button class="radar-btn" onclick="radarPlayPause()">▶️ Play</button>
+                <button class="radar-btn" onclick="radarPlayPause()">▶️</button>
                 <button class="radar-btn" onclick="radarPrev()">⏮️</button>
                 <button class="radar-btn" onclick="radarNext()">⏭️</button>
                 <div class="radar-timestamp" id="radar-timestamp">--:--</div>
@@ -619,6 +677,9 @@
         let radarFrames = [];
         let radarCurrentFrame = 0;
         let radarAnimationTimer = null;
+        let idiomsList = [];
+        let idiomIndex = 0;
+        let idiomRotationTimer = null;
         let radarIsPlaying = false;
 
         // Column visibility state
@@ -808,6 +869,27 @@
         function updateLocationDisplay() {
             document.getElementById('location-name').textContent = currentLocationName;
             updateSaveButton();
+        }
+
+        function updateIdiomDisplay() {
+            if (idiomsList.length > 0) {
+                document.getElementById('header-weather').innerHTML = idiomsList[idiomIndex];
+            }
+        }
+
+        function startIdiomRotation() {
+            // Clear existing timer
+            if (idiomRotationTimer) {
+                clearInterval(idiomRotationTimer);
+            }
+
+            // Only rotate if there's more than one idiom
+            if (idiomsList.length > 1) {
+                idiomRotationTimer = setInterval(() => {
+                    idiomIndex = (idiomIndex + 1) % idiomsList.length;
+                    updateIdiomDisplay();
+                }, 4000); // Rotate every 4 seconds
+            }
         }
 
         // Geocoding with Nominatim
@@ -1066,43 +1148,62 @@
             return isNight ? '🌙' : '☀️';
         }
 
-        function getWeatherIdiom(forecast) {
+        function getWeatherIdioms(forecast) {
+            const idioms = [];
             const text = (forecast.shortForecast + ' ' + forecast.detailedForecast).toLowerCase();
             const temp = forecast.temperature;
             const windSpeed = parseInt(forecast.windSpeed);
             const humidity = forecast.relativeHumidity?.value;
+            const precipChance = forecast.probabilityOfPrecipitation?.value || 0;
 
-            // Check in priority order (most specific first)
-            if (text.includes('tornado')) return "Watch for flying houses";
-            if (text.includes('flood')) return "Everything's coming up Milhouse";
-            if (text.includes('thunder') || text.includes('storm')) return "Storms a-brewin";
-            if (text.includes('snow') || text.includes('flurr') || text.includes('blizzard')) return "Let is snow";
-            if (text.includes('sleet') || text.includes('freezing') || text.includes('ice')) return "Got skates?";
-            if (text.includes('rain') || text.includes('shower') || text.includes('drizzle')) return "Tut tut, it looks like rain";
-            if (text.includes('fog')) return "Lost in the fog";
-
-            // Temperature-based (check before other conditions)
-            if (temp >= 90) return "ITS GON BE HOT";
-            if (temp <= 32) return "ITS GON BE COLD";
-
-            // Humidity-based
-            if (humidity && humidity >= 80) return "It's not the heat, it's the humidity";
-
-            // Wind-based
-            if (windSpeed >= 20) return "It's not <i>that</i> the wind is blowing...";
-
-            // Cloud cover
-            if (text.includes('partly cloudy') || text.includes('mostly sunny')) return "Half cloudy, or half sunny?";
-            if (text.includes('cloudy') || text.includes('overcast')) return "Silver linings abound";
-
-            // Clear/sunny
-            if (text.includes('clear') || text.includes('sunny')) {
-                const isNight = forecast.isDaytime === false || (forecast.name && forecast.name.toLowerCase().includes('night'));
-                return isNight ? "Perfect for stargazing" : "Walkin on sunshine";
+            // Check for feels-like temperature
+            let feelsLikeTemp = temp;
+            if (forecast.heatIndex?.value != null) {
+                feelsLikeTemp = Math.max(temp, forecast.heatIndex.value);
             }
 
-            // Default
-            return "Perfect for stargazing";
+            // Collect all applicable idioms (most specific first)
+            if (text.includes('tornado')) idioms.push("Watch for flying houses");
+            if (text.includes('flood')) idioms.push("Everything's coming up Milhouse");
+
+            // Special combo: hot, humid, might rain
+            if ((temp >= 90 || feelsLikeTemp >= 90) && precipChance >= 20 && humidity >= 70) {
+                idioms.push("Hot, humid, might rain");
+            }
+
+            if (text.includes('thunder') || text.includes('storm')) idioms.push("Storms a-brewin");
+            if (text.includes('snow') || text.includes('flurr') || text.includes('blizzard')) idioms.push("Let is snow");
+            if (text.includes('sleet') || text.includes('freezing') || text.includes('ice')) idioms.push("Got skates?");
+            if (text.includes('rain') || text.includes('shower') || text.includes('drizzle')) idioms.push("Tut tut, it looks like rain");
+            if (text.includes('fog')) idioms.push("Lost in the fog");
+
+            // Temperature-based
+            if (temp >= 90) idioms.push("ITS GON BE HOT");
+            if (temp <= 32) idioms.push("ITS GON BE COLD");
+
+            // Humidity-based
+            if (humidity && humidity >= 80) idioms.push("It's not the heat, it's the humidity");
+
+            // Wind-based
+            if (windSpeed >= 20) idioms.push("It's not <i>that</i> the wind is blowing...");
+
+            // Cloud cover
+            if (text.includes('partly cloudy') || text.includes('mostly sunny')) idioms.push("Half cloudy, or half sunny?");
+            if (text.includes('cloudy') || text.includes('overcast')) idioms.push("Silver linings abound");
+
+            // Clear/sunny (but not partly/mostly variants)
+            if ((text.includes('clear') || text.includes('sunny')) &&
+                !text.includes('partly') && !text.includes('mostly')) {
+                const isNight = forecast.isDaytime === false || (forecast.name && forecast.name.toLowerCase().includes('night'));
+                idioms.push(isNight ? "Perfect for stargazing" : "Walkin on sunshine");
+            }
+
+            // Default if none match
+            if (idioms.length === 0) {
+                idioms.push("Perfect for stargazing");
+            }
+
+            return idioms;
         }
 
         function getSevereWeather(forecast) {
@@ -1188,31 +1289,45 @@
 
             // Render current conditions (first period)
             const current = currentData.forecast[0];
-            const currentHumidity = getHumidityStats(current.startTime, current.endTime);
+
+            // Get current humidity from hourly data (first hour = current/nearest)
             let humidityDisplay = 'N/A';
-            if (currentHumidity) {
-                humidityDisplay = `${currentHumidity.avg}% [${currentHumidity.min}-${currentHumidity.max}]`;
+            if (currentData.hourly && currentData.hourly.length > 0 && currentData.hourly[0].relativeHumidity?.value != null) {
+                humidityDisplay = `${currentData.hourly[0].relativeHumidity.value}%`;
             } else if (current.relativeHumidity?.value) {
                 humidityDisplay = `${current.relativeHumidity.value}%`;
             }
 
-            const nwsPrecip = current.probabilityOfPrecipitation?.value;
-            let precipDisplay;
-            if (nwsPrecip != null) {
-                precipDisplay = `${nwsPrecip}%`;
-            } else {
-                const currentPrecip = getPrecipitationStats(current.startTime, current.endTime);
-                precipDisplay = currentPrecip ? `${currentPrecip.max}%` : 'N/A';
+            // Get current precip from hourly data (first hour = current/nearest)
+            let precipDisplay = 'N/A';
+            if (currentData.hourly && currentData.hourly.length > 0 && currentData.hourly[0].probabilityOfPrecipitation?.value != null) {
+                precipDisplay = `${currentData.hourly[0].probabilityOfPrecipitation.value}%`;
+            } else if (current.probabilityOfPrecipitation?.value != null) {
+                precipDisplay = `${current.probabilityOfPrecipitation.value}%`;
             }
+
+            // Get current wind from hourly data (first hour = current/nearest)
+            let currentWindSpeed, currentWindDir;
+            if (currentData.hourly && currentData.hourly.length > 0) {
+                const currentHour = currentData.hourly[0];
+                const windSpeedRaw = currentHour.windSpeed || current.windSpeed;
+                currentWindSpeed = windSpeedRaw.replace(' mph', '').split(' ')[0];
+                const windDirRaw = currentHour.windDirection || current.windDirection;
+                currentWindDir = getWindDirectionEmoji(windDirRaw);
+            } else {
+                currentWindSpeed = current.windSpeed.replace(' mph', '');
+                currentWindDir = getWindDirectionEmoji(current.windDirection);
+            }
+
             const currentPrecipEmoji = getPrecipEmoji(current);
             const currentSevere = getSevereWeather(current);
             const currentConditionIcon = getConditionIcon(current);
 
-            // Update header with weather idiom
-            document.getElementById('header-weather').innerHTML = getWeatherIdiom(current);
-
-            const currentWindSpeed = current.windSpeed.replace(' mph', '');
-            const currentWindDir = getWindDirectionEmoji(current.windDirection);
+            // Update header with rotating weather idioms
+            idiomsList = getWeatherIdioms(current);
+            idiomIndex = 0;
+            updateIdiomDisplay();
+            startIdiomRotation();
 
             const currentTempF = current.temperatureUnit === 'F' ? current.temperature : Math.round(current.temperature * 9/5 + 32);
             const currentTempColor = getTempColor(currentTempF);
@@ -1457,7 +1572,7 @@
                             ` : ''}
                             ${COLUMNS.wind.visible ? `
                             <div class="hourly-data-item">
-                                <div class="data-value">${windSpeedDisplay} ${windDirEmoji}</div>
+                                <div class="data-value">${windSpeedDisplay}${windDirEmoji}</div>
                                 <div class="bar-container">
                                     <div class="bar-fill" style="width: ${windBarWidth}%; background: ${windColor};"></div>
                                 </div>
@@ -1559,13 +1674,13 @@
             if (radarIsPlaying) {
                 clearInterval(radarAnimationTimer);
                 radarIsPlaying = false;
-                document.querySelector('.radar-controls button').textContent = '▶️ Play';
+                document.querySelector('.radar-controls button').textContent = '▶️';
             } else {
                 radarAnimationTimer = setInterval(() => {
                     radarNext();
                 }, 500);
                 radarIsPlaying = true;
-                document.querySelector('.radar-controls button').textContent = '⏸️ Pause';
+                document.querySelector('.radar-controls button').textContent = '⏸️';
             }
         }
 
