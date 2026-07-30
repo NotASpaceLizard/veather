@@ -81,7 +81,10 @@ Single-page progressive web app that displays current conditions, multi-day fore
 
 #### Smart Features
 - **Weather icons** - Emoji-based, context-aware (day/night detection)
-- **Precipitation type detection** - Auto-detects ⚡thunder, ❄️snow, 🧊ice, 🌧️rain
+- **Dynamic emojis** - Adapt to conditions:
+  - Precipitation: 🌂 <10% chance, ⛈️ thunder, ❄️ snow, 🧊 ice, ☔ rain, 🤷 no data
+  - Wind: 🌬️ ≥15 mph, 💨 light breeze, 🤷 no data
+  - Humidity: 🌵 <40% (dry), 💧 40-70% (normal), 💦 >70% (humid), 🤷 no data
 - **Wind direction arrows** - Shows where wind is blowing (not where it's from)
 - **Severe weather detection** - Flags 🌪️tornadoes, ⛈️storms, 🌊floods, 🥵heat, 🥶cold, etc.
 - **Auto-refresh** - Weather data updates every 30 minutes
@@ -317,5 +320,5 @@ Color palette designed for red-green colorblindness:
 ---
 
 **Last Updated**: 2026-07-30
-**Version**: 1.0
+**Version**: 1.1
 **Status**: Production ready

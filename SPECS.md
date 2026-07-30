@@ -1,6 +1,6 @@
 # Veather Technical Specifications
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Last Updated**: 2026-07-30  
 **Status**: Production
 
@@ -208,7 +208,11 @@ GET /gridpoints/{office}/{gridX},{gridY}/forecast/hourly
 ```
 
 **Response**: Similar to forecast but 156 hourly periods  
-**Usage**: Detailed hourly data, aggregated for forecast periods  
+**Usage**:
+- **Current conditions**: First hourly data point (most accurate "right now")
+- **Forecast periods**: Aggregated stats (avg, min, max) for 12-hour windows
+- **Hourly tab**: First 24 hours displayed with charts
+
 **Data Points**: temp, wind, precip, humidity, heat index, wind chill, UV
 
 #### 4. Alerts Endpoint
@@ -379,10 +383,34 @@ if (feelsLike != null && Math.abs(feelsLikeF - actualTempF) >= 3) {
 4. Return { avg, min, max } or null if no data
 ```
 
-**Display Format**: `avg% [min-max]`  
-**Example**: `65% [58-72]`
+**Display Format**:
+- **Forecast periods**: `avg% [min-max]` (e.g., `65% [58-72]`)
+- **Current conditions**: Single value from first hourly data point (e.g., `65%`)
 
-**Same logic applies to `getPrecipitationStats()`**
+**Function**: `getPrecipitationStats(startTime, endTime)`
+
+**Algorithm**: Same as humidity stats (avg, min, max from hourly data)
+
+**Display Logic**:
+```javascript
+// Current conditions: use first hour
+if (currentData.hourly[0].probabilityOfPrecipitation?.value != null) {
+  precipDisplay = `${currentData.hourly[0].probabilityOfPrecipitation.value}%`;
+}
+
+// Forecast periods: NWS value or max from hourly
+if (period.probabilityOfPrecipitation?.value != null) {
+  precipDisplay = `${period.probabilityOfPrecipitation.value}%`;
+} else {
+  const stats = getPrecipitationStats(period.startTime, period.endTime);
+  precipDisplay = stats ? `${stats.max}%` : 'N/A';
+}
+```
+
+**Reasoning**:
+- Current conditions show "right now" data (first hourly point)
+- Forecast periods show NWS aggregate or max hourly chance
+- Simplified from previous format that showed full range
 
 ### Wind Direction Conversion
 
@@ -464,6 +492,120 @@ return '☀️';
 **Display**: Joined with ` • ` separator  
 **Example**: `🌪️ Tornado • 🌊 Flood`
 
+### Dynamic Weather Emojis
+
+**Purpose**: Contextual emojis that adapt to current conditions
+
+**Function**: `getPrecipEmoji(forecast, precipProb)`
+
+**Logic**:
+```javascript
+// No data available
+if (precipProb == null) return '🤷';
+
+// Very low precipitation chance
+if (precipProb < 10) return '🌂'; // Closed umbrella
+
+// Type-based precipitation (checks forecast text)
+if (text.includes('thunder')) return '⛈️';
+if (text.includes('freezing rain') || text.includes('ice')) return '🧊';
+if (text.includes('snow')) return '❄️';
+if (text.includes('wintry mix')) return '🌨️';
+// Default: ☔
+```
+
+**Function**: `getWindEmoji(windSpeedStr)`
+
+**Logic**:
+```javascript
+if (!windSpeedStr || isNaN(windSpeed)) return '🤷';
+if (windSpeed >= 15) return '🌬️'; // Windy face
+return '💨'; // Light breeze
+```
+
+**Threshold Note**: 15 mph chosen based on Hyattsville, MD local climate feel
+
+**Function**: `getHumidityEmoji(humidityValue)`
+
+**Logic**:
+```javascript
+if (!humidityValue || humidityValue === 0) return '🤷';
+if (humidityValue < 40) return '🌵'; // Dry/desert
+if (humidityValue > 70) return '💦'; // Humid/muggy
+return '💧'; // Normal
+```
+
+**Threshold Note**: 40% lower bound chosen for humid subtropical climate (rarely <30% in Hyattsville, MD)
+
+### Weather Idioms
+
+**Function**: `getWeatherIdioms(forecast)`
+
+**Purpose**: Returns array of contextual weather phrases that rotate in header
+
+**Algorithm** (priority order):
+```javascript
+1. Check severe weather:
+   - tornado → "Watch for flying houses"
+   - flood → "Everything's coming up Milhouse"
+
+2. Check special combinations:
+   - (temp/feels ≥90°F) AND (precip ≥20%) AND (humidity ≥70%)
+     → "Hot, humid, might rain"
+
+3. Check precipitation:
+   - thunder/storm → "Storms a-brewin"
+   - snow/blizzard → "Let is snow"
+   - ice/freezing → "Got skates?"
+   - rain/shower/drizzle → "Tut tut, it looks like rain"
+   - fog → "Lost in the fog"
+
+4. Check temperature extremes:
+   - temp ≥90°F → "ITS GON BE HOT"
+   - temp ≤32°F → "ITS GON BE COLD"
+
+5. Check humidity:
+   - humidity ≥80% → "It's not the heat, it's the humidity"
+
+6. Check wind:
+   - windSpeed ≥20mph → "It's not <i>that</i> the wind is blowing..."
+
+7. Check cloud cover:
+   - partly cloudy/mostly sunny → "Half cloudy, or half sunny?"
+   - cloudy/overcast → "Silver linings abound"
+
+8. Check clear/sunny (exclude partly/mostly):
+   - Night → "Perfect for stargazing"
+   - Day → "Walkin on sunshine"
+
+9. Default if none match:
+   - "Perfect for stargazing"
+```
+
+**Rotation Logic**:
+```javascript
+// Display first idiom immediately
+idiomIndex = 0;
+updateIdiomDisplay();
+
+// Rotate every 4 seconds if multiple idioms
+if (idiomsList.length > 1) {
+  setInterval(() => {
+    idiomIndex = (idiomIndex + 1) % idiomsList.length;
+    updateIdiomDisplay();
+  }, 4000);
+}
+```
+
+**Design Notes**:
+- Multiple applicable idioms all displayed in rotation
+- Example: Hot, sunny, humid day rotates through:
+  1. "ITS GON BE HOT"
+  2. "Walkin on sunshine"
+  3. "It's not the heat, it's the humidity"
+- Special combo prevents redundant hot + sunny when rain likely
+- Night/day detection uses `isDaytime` property
+
 ### Radar Animation
 
 **State Management**:
@@ -536,6 +678,11 @@ let radarFrames = [];
 let radarCurrentFrame = 0;
 let radarAnimationTimer = null;
 let radarIsPlaying = false;
+
+// Idiom State
+let idiomsList = [];              // Array of applicable idioms
+let idiomIndex = 0;               // Current idiom being displayed
+let idiomRotationTimer = null;    // setInterval ID for rotation
 ```
 
 ### localStorage Keys
@@ -715,6 +862,11 @@ setInterval(loadWeather, 30 * 60 * 1000);
 - Leaflet handles tile caching
 - Animation uses setInterval (not requestAnimationFrame)
 
+**Header Idioms**:
+- Rotates via `setInterval` (4000ms) when multiple idioms applicable
+- Uses `innerHTML` (not DOM manipulation) for simplicity
+- Timer cleared and reset on location change to prevent memory leaks
+
 ### Memory Usage
 
 **Estimated**:
@@ -847,11 +999,14 @@ setInterval(loadWeather, 30 * 60 * 1000);
 - [ ] Zoom in/out (4-10)
 
 **Mobile**:
-- [ ] Touch targets (44x44px)
-- [ ] Font sizes readable
-- [ ] Horizontal scroll avoided
-- [ ] Tabs scroll if needed
-- [ ] Column toggles tappable
+- [ ] Touch targets (44x44px minimum)
+- [ ] Font sizes readable (temps 3em+, tabs 1em on mobile)
+- [ ] Tabs resize and scroll on small screens (<400px)
+- [ ] Column toggles scroll horizontally without wrapping
+- [ ] Search bar and buttons stay on one line
+- [ ] Timestamps use white-space: nowrap
+- [ ] Wind display compact (no space between speed/emoji)
+- [ ] Time column wide enough (70px) for "12:00 PM"
 
 ### Browser Testing
 

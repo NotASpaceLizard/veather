@@ -6,7 +6,7 @@
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
     Author:         David Sheldon
-    Version:        1.0
+    Version:        1.1
     Last Updated:   2026-07-30
 
     Description:
@@ -1067,12 +1067,22 @@
             return { avg, min, max };
         }
 
-        function getPrecipEmoji(forecast) {
+        function getPrecipEmoji(forecast, precipProb) {
+            // Check if no data available
+            if (precipProb == null) {
+                return '🤷';
+            }
+
+            // Check if precipitation is very low
+            if (precipProb < 10) {
+                return '🌂';
+            }
+
             const text = (forecast.shortForecast + ' ' + forecast.detailedForecast).toLowerCase();
             let emoji = '☔'; // Default to rain
 
             // Check in priority order (most specific first)
-            if (text.includes('thunder') || text.includes('tstorm')) emoji = '⚡';
+            if (text.includes('thunder') || text.includes('tstorm')) emoji = '⛈️';
             else if (text.includes('freezing rain') || text.includes('ice storm')) emoji = '🧊';
             else if (text.includes('sleet') || text.includes('ice pellet')) emoji = '🧊';
             else if (text.includes('snow') || text.includes('flurr') || text.includes('blizzard')) emoji = '❄️';
@@ -1109,6 +1119,20 @@
             };
 
             return dirMap[dir] || '🧭';
+        }
+
+        function getWindEmoji(windSpeedStr) {
+            if (!windSpeedStr) return '🤷';
+            const windSpeed = parseInt(windSpeedStr);
+            if (isNaN(windSpeed)) return '🤷';
+            return windSpeed >= 15 ? '🌬️' : '💨';
+        }
+
+        function getHumidityEmoji(humidityValue) {
+            if (!humidityValue || humidityValue === 0) return '🤷';
+            if (humidityValue < 40) return '🌵';
+            if (humidityValue > 70) return '💦';
+            return '💧';
         }
 
         function getConditionIcon(forecast) {
@@ -1185,7 +1209,7 @@
 
             // Cloud cover
             if (text.includes('partly cloudy') || text.includes('mostly sunny')) idioms.push("Half cloudy, or half sunny?");
-            if (text.includes('cloudy') || text.includes('overcast')) idioms.push("Silver linings abound");
+            if ((text.includes('cloudy') || text.includes('overcast')) && !text.includes('partly')) idioms.push("Silver linings abound");
 
             // Clear/sunny (but not partly/mostly variants)
             if ((text.includes('clear') || text.includes('sunny')) &&
@@ -1289,34 +1313,43 @@
 
             // Get current humidity from hourly data (first hour = current/nearest)
             let humidityDisplay = 'N/A';
+            let currentHumidityValue = 0;
             if (currentData.hourly && currentData.hourly.length > 0 && currentData.hourly[0].relativeHumidity?.value != null) {
-                humidityDisplay = `${currentData.hourly[0].relativeHumidity.value}%`;
+                currentHumidityValue = currentData.hourly[0].relativeHumidity.value;
+                humidityDisplay = `${currentHumidityValue}%`;
             } else if (current.relativeHumidity?.value) {
-                humidityDisplay = `${current.relativeHumidity.value}%`;
+                currentHumidityValue = current.relativeHumidity.value;
+                humidityDisplay = `${currentHumidityValue}%`;
             }
 
             // Get current precip from hourly data (first hour = current/nearest)
             let precipDisplay = 'N/A';
+            let currentPrecipValue = null;
             if (currentData.hourly && currentData.hourly.length > 0 && currentData.hourly[0].probabilityOfPrecipitation?.value != null) {
-                precipDisplay = `${currentData.hourly[0].probabilityOfPrecipitation.value}%`;
+                currentPrecipValue = currentData.hourly[0].probabilityOfPrecipitation.value;
+                precipDisplay = `${currentPrecipValue}%`;
             } else if (current.probabilityOfPrecipitation?.value != null) {
-                precipDisplay = `${current.probabilityOfPrecipitation.value}%`;
+                currentPrecipValue = current.probabilityOfPrecipitation.value;
+                precipDisplay = `${currentPrecipValue}%`;
             }
 
             // Get current wind from hourly data (first hour = current/nearest)
-            let currentWindSpeed, currentWindDir;
+            let currentWindSpeed, currentWindDir, currentWindSpeedRaw;
             if (currentData.hourly && currentData.hourly.length > 0) {
                 const currentHour = currentData.hourly[0];
-                const windSpeedRaw = currentHour.windSpeed || current.windSpeed;
-                currentWindSpeed = windSpeedRaw.replace(' mph', '').split(' ')[0];
+                currentWindSpeedRaw = currentHour.windSpeed || current.windSpeed;
+                currentWindSpeed = currentWindSpeedRaw.replace(' mph', '').split(' ')[0];
                 const windDirRaw = currentHour.windDirection || current.windDirection;
                 currentWindDir = getWindDirectionEmoji(windDirRaw);
             } else {
-                currentWindSpeed = current.windSpeed.replace(' mph', '');
+                currentWindSpeedRaw = current.windSpeed;
+                currentWindSpeed = currentWindSpeedRaw.replace(' mph', '');
                 currentWindDir = getWindDirectionEmoji(current.windDirection);
             }
 
-            const currentPrecipEmoji = getPrecipEmoji(current);
+            const currentPrecipEmoji = getPrecipEmoji(current, currentPrecipValue);
+            const currentWindEmoji = getWindEmoji(currentWindSpeed);
+            const currentHumidityEmoji = getHumidityEmoji(currentHumidityValue);
             const currentSevere = getSevereWeather(current);
             const currentConditionIcon = getConditionIcon(current);
 
@@ -1332,27 +1365,37 @@
                 forecastTabBtn.textContent = currentConditionIcon;
             }
 
-            const currentTempF = current.temperatureUnit === 'F' ? current.temperature : Math.round(current.temperature * 9/5 + 32);
+            // Get current temp from hourly data (first hour = current/nearest)
+            let currentTemp, currentTempUnit;
+            if (currentData.hourly && currentData.hourly.length > 0) {
+                currentTemp = currentData.hourly[0].temperature;
+                currentTempUnit = currentData.hourly[0].temperatureUnit;
+            } else {
+                currentTemp = current.temperature;
+                currentTempUnit = current.temperatureUnit;
+            }
+
+            const currentTempF = currentTempUnit === 'F' ? currentTemp : Math.round(currentTemp * 9/5 + 32);
             const currentTempColor = getTempColor(currentTempF);
 
             html += `
                 <div class="current">
-                    <div class="current-temp" style="color: ${currentTempColor};">${currentConditionIcon} ${current.temperature}°${current.temperatureUnit}</div>
+                    <div class="current-temp" style="color: ${currentTempColor};">${currentConditionIcon} ${currentTemp}°${currentTempUnit}</div>
                     <div class="current-conditions">${current.shortForecast}</div>
                     <div class="current-details">
                         <div class="detail-item">
-                            <div class="detail-emoji">${currentPrecipEmoji}</div>
                             <div class="detail-label">PRECIP</div>
+                            <div class="detail-emoji">${currentPrecipEmoji}</div>
                             <div class="detail-value">${precipDisplay}</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-emoji">💨</div>
                             <div class="detail-label">WIND</div>
+                            <div class="detail-emoji">${currentWindEmoji}</div>
                             <div class="detail-value">${currentWindSpeed}${currentWindDir}</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-emoji">💦</div>
                             <div class="detail-label">HUMID</div>
+                            <div class="detail-emoji">${currentHumidityEmoji}</div>
                             <div class="detail-value">${humidityDisplay}</div>
                         </div>
                     </div>
@@ -1360,34 +1403,100 @@
                 </div>
             `;
 
+            // Render current 12-hour period
+            const currentPeriodHumidityStats = getHumidityStats(current.startTime, current.endTime);
+            let currentPeriodHumidityDisplay = 'N/A';
+            let currentPeriodHumidityValue = 0;
+            if (currentPeriodHumidityStats) {
+                currentPeriodHumidityValue = currentPeriodHumidityStats.avg;
+                currentPeriodHumidityDisplay = `${currentPeriodHumidityValue}% [${currentPeriodHumidityStats.min}-${currentPeriodHumidityStats.max}]`;
+            } else if (current.relativeHumidity?.value) {
+                currentPeriodHumidityValue = current.relativeHumidity.value;
+                currentPeriodHumidityDisplay = `${currentPeriodHumidityValue}%`;
+            }
+
+            const currentPeriodNwsPrecip = current.probabilityOfPrecipitation?.value;
+            let currentPeriodPrecipDisplay;
+            let currentPeriodPrecipValue = null;
+            if (currentPeriodNwsPrecip != null) {
+                currentPeriodPrecipValue = currentPeriodNwsPrecip;
+                currentPeriodPrecipDisplay = `${currentPeriodNwsPrecip}%`;
+            } else {
+                const precipStats = getPrecipitationStats(current.startTime, current.endTime);
+                if (precipStats) {
+                    currentPeriodPrecipValue = precipStats.max;
+                    currentPeriodPrecipDisplay = `${precipStats.max}%`;
+                } else {
+                    currentPeriodPrecipDisplay = 'N/A';
+                }
+            }
+            const currentPeriodPrecipEmoji = getPrecipEmoji(current, currentPeriodPrecipValue);
+            const currentPeriodSevere = getSevereWeather(current);
+            const currentPeriodConditionIcon = getConditionIcon(current);
+            const currentPeriodWindSpeed = current.windSpeed.replace(' mph', '');
+            const currentPeriodWindDir = getWindDirectionEmoji(current.windDirection);
+            const currentPeriodWindEmoji = getWindEmoji(currentPeriodWindSpeed);
+            const currentPeriodHumidityEmoji = getHumidityEmoji(currentPeriodHumidityValue);
+
+            const currentPeriodTempF = current.temperatureUnit === 'F' ? current.temperature : Math.round(current.temperature * 9/5 + 32);
+            const currentPeriodTempColor = getTempColor(currentPeriodTempF);
+
+            html += `
+                <div class="forecast-period">
+                    <div class="period-header">
+                        <div class="period-name">${current.name}</div>
+                        <div class="period-temp" style="color: ${currentPeriodTempColor};">${currentPeriodConditionIcon} ${current.temperature}°${current.temperatureUnit}</div>
+                    </div>
+                    <div class="period-forecast">${current.detailedForecast}</div>
+                    <div class="period-details">
+                        <div>${currentPeriodPrecipEmoji} ${currentPeriodPrecipDisplay}</div>
+                        <div>${currentPeriodWindEmoji} ${currentPeriodWindSpeed} ${currentPeriodWindDir}</div>
+                        <div>${currentPeriodHumidityEmoji} ${currentPeriodHumidityDisplay}</div>
+                    </div>
+                    ${currentPeriodSevere ? `<div class="severe-weather">${currentPeriodSevere}</div>` : ''}
+                </div>
+            `;
+
             // Render forecast periods
             currentData.forecast.forEach((period, index) => {
-                // Skip first period since we showed it as current
+                // Skip first period since we showed it above
                 if (index === 0) return;
 
                 // Calculate humidity from hourly data
                 const humidityStats = getHumidityStats(period.startTime, period.endTime);
                 let humidityDisplay = 'N/A';
+                let humidityValue = 0;
                 if (humidityStats) {
-                    humidityDisplay = `${humidityStats.avg}% [${humidityStats.min}-${humidityStats.max}]`;
+                    humidityValue = humidityStats.avg;
+                    humidityDisplay = `${humidityValue}% [${humidityStats.min}-${humidityStats.max}]`;
                 } else if (period.relativeHumidity?.value) {
-                    humidityDisplay = `${period.relativeHumidity.value}%`;
+                    humidityValue = period.relativeHumidity.value;
+                    humidityDisplay = `${humidityValue}%`;
                 }
 
                 // Calculate precipitation from hourly data
                 const nwsPrecip = period.probabilityOfPrecipitation?.value;
                 let precipDisplay;
+                let precipValue = null;
                 if (nwsPrecip != null) {
+                    precipValue = nwsPrecip;
                     precipDisplay = `${nwsPrecip}%`;
                 } else {
                     const precipStats = getPrecipitationStats(period.startTime, period.endTime);
-                    precipDisplay = precipStats ? `${precipStats.max}%` : 'N/A';
+                    if (precipStats) {
+                        precipValue = precipStats.max;
+                        precipDisplay = `${precipStats.max}%`;
+                    } else {
+                        precipDisplay = 'N/A';
+                    }
                 }
-                const precipEmoji = getPrecipEmoji(period);
+                const precipEmoji = getPrecipEmoji(period, precipValue);
                 const periodSevere = getSevereWeather(period);
                 const conditionIcon = getConditionIcon(period);
                 const periodWindSpeed = period.windSpeed.replace(' mph', '');
                 const periodWindDir = getWindDirectionEmoji(period.windDirection);
+                const periodWindEmoji = getWindEmoji(periodWindSpeed);
+                const periodHumidityEmoji = getHumidityEmoji(humidityValue);
 
                 const periodTempF = period.temperatureUnit === 'F' ? period.temperature : Math.round(period.temperature * 9/5 + 32);
                 const periodTempColor = getTempColor(periodTempF);
@@ -1401,8 +1510,8 @@
                         <div class="period-forecast">${period.detailedForecast}</div>
                         <div class="period-details">
                             <div>${precipEmoji} ${precipDisplay}</div>
-                            <div>💨 ${periodWindSpeed} ${periodWindDir}</div>
-                            <div>💦 ${humidityDisplay}</div>
+                            <div>${periodWindEmoji} ${periodWindSpeed} ${periodWindDir}</div>
+                            <div>${periodHumidityEmoji} ${humidityDisplay}</div>
                         </div>
                         ${periodSevere ? `<div class="severe-weather">${periodSevere}</div>` : ''}
                     </div>
